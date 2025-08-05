@@ -1,0 +1,100 @@
+import { PrismaClient, Prisma, SignLanguage } from '../generated/prisma';
+import { promises as fs } from 'fs';
+import * as path from 'node:path';
+import 'dotenv/config';
+
+const prisma = new PrismaClient();
+
+const aliasMap = {
+  senang: 'gembira',
+  mengapa: 'kenapa',
+  di_mana: 'ke_mana',
+};
+
+async function readAndParseFile(filename: string): Promise<string[]> {
+  try {
+    const filePath = path.join(__dirname, filename);
+    const fileContent = await fs.readFile(filePath, 'utf-8');
+    return fileContent
+      .replace(/"/g, '')
+      .split(',')
+      .map((entry) => entry.trim());
+  } catch (error) {
+    console.error(`Error reading file ${filename}:`, error);
+    return [];
+  }
+}
+
+async function main() {
+  console.log('Starting database seeding...');
+
+  const alphabetNames = await readAndParseFile('bisindo_alphabets.txt');
+  const wordNames = await readAndParseFile('bisindo_words.txt');
+
+  const streamServer = process.env.STREAM_SERVER;
+
+  if (!streamServer) {
+    console.error(
+      'STREAM_SERVER environment variable is not set. Please check your .env file.',
+    );
+    process.exit(1);
+  }
+
+  // Seed alphabet entries
+  console.log('Seeding alphabet entries...');
+  for (const rawName of alphabetNames) {
+    const splited = rawName.split('_');
+    const removedPrefix: string = rawName.replace('BISINDO_', '');
+    const name: string = removedPrefix.replace('_', ' ');
+    const url = `${streamServer}/${splited[0]}_${name}.m3u8`;
+
+    await prisma.entry.create({
+      data: {
+        name: name,
+        url: url,
+        signLang: splited[0] as SignLanguage,
+        type: 'LETTER',
+      },
+    });
+  }
+
+  // Seed word entries
+  console.log('Seeding word entries...');
+  for (const rawName of wordNames) {
+    const splited = rawName.split('_');
+    const removedPrefix: string = rawName.replace('BISINDO_', '');
+    const name: string = removedPrefix.replace('_', ' ');
+    const url = `${streamServer}/${splited[0]}_${name}.m3u8`;
+
+    // Check for an alias
+    const aliasName = aliasMap[name as keyof typeof aliasMap];
+
+    // Construct the data object
+    const entryData: Prisma.EntryCreateInput = {
+      name: name,
+      url: url,
+      signLang: splited[0] as SignLanguage,
+      type: 'WORD',
+    };
+
+    // If an alias exists, add it to the nested create
+    if (aliasName) {
+      entryData.aliases = {
+        create: [{ name: aliasName }],
+      };
+    }
+
+    await prisma.entry.create({ data: entryData });
+  }
+
+  console.log('Seeding completed successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SignLanguage {
+  BISINDO
+  SIBI
+}
+
+enum EntryType {
+  LETTER
+  NUMBER
+  WORD
+}
+
+model Entry {
+  id       Int          @id @default(autoincrement())
+  name     String       @unique
+  url      String
+  signLang SignLanguage @map("sign_lang")
+  source   String?
+  type     EntryType
+  aliases  Alias[]
+
+  @@map("entries")
+}
+
+model Alias {
+  id      Int    @id @default(autoincrement())
+  name    String
+  entryId Int    @map("entry_id")
+  entry   Entry  @relation(fields: [entryId], references: [id])
+
+  @@map("aliases")
+}
