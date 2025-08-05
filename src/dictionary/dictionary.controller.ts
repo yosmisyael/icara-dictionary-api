@@ -9,7 +9,7 @@ import {
 import { DictionaryService } from './dictionary.service';
 import { Entry } from 'generated/prisma';
 
-@Controller('dictionary')
+@Controller('api/dictionary')
 export class DictionaryController {
   constructor(private readonly dictionaryService: DictionaryService) {}
 
