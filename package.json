@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "prisma": "npx prisma",
-    "seed": "prisma/seed.sh",
+    "seed": "./prisma/seed.sh",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.5",
     "@nestjs/platform-fastify": "^11.1.5",
     "@prisma/client": "^6.13.0",

@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { DictionaryService } from './dictionary.service';
 import { Entry } from 'generated/prisma';
+import { WebResponse } from '../model/web.model';
+import { EntryDto } from './dto/dictionary.dto';
 
 @Controller('api/dictionary')
 export class DictionaryController {
@@ -15,15 +17,17 @@ export class DictionaryController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  async getDictionaryList(): Promise<Entry[]> {
-    return this.dictionaryService.getAllEntries();
+  async getDictionaryList(): Promise<WebResponse<Entry[]>> {
+    const data: EntryDto[] = await this.dictionaryService.getAllEntries();
+    return { data };
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getDictionaryEntryById(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<Entry> {
-    return this.dictionaryService.getEntryById(id);
+  ): Promise<WebResponse<Entry>> {
+    const data = await this.dictionaryService.getEntryById(id);
+    return { data };
   }
 }

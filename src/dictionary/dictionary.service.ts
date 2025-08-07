@@ -1,13 +1,13 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { Entry } from 'generated/prisma';
+import { EntryDto, toEntryDto } from './dto/dictionary.dto';
 
 @Injectable()
 export class DictionaryService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  getAllEntries(): Promise<Entry[]> {
-    return this.prismaService.entry.findMany({
+  async getAllEntries(): Promise<EntryDto[]> {
+    const result = await this.prismaService.entry.findMany({
       include: {
         aliases: {
           select: {
@@ -16,9 +16,11 @@ export class DictionaryService {
         },
       },
     });
+
+    return result.map((entry) => toEntryDto(entry));
   }
 
-  async getEntryById(id: number): Promise<Entry> {
+  async getEntryById(id: number): Promise<EntryDto> {
     const result = await this.prismaService.entry.findFirst({
       where: {
         id,
@@ -36,6 +38,6 @@ export class DictionaryService {
       throw new HttpException('Entry not found', HttpStatus.NOT_FOUND);
     }
 
-    return result;
+    return toEntryDto(result);
   }
 }

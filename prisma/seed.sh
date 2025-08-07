@@ -1,7 +1,7 @@
 #!/bin/bash
 
-ORIGINAL_FILE="./seed"
-TS_FILE="./seed.ts"
+ORIGINAL_FILE="./prisma/seed"
+TS_FILE="./prisma/seed.ts"
 
 echo "Renaming file: $ORIGINAL_FILE -> $TS_FILE"
 mv "$ORIGINAL_FILE" "$TS_FILE"
