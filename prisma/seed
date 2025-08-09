@@ -5,20 +5,18 @@ import 'dotenv/config';
 
 const prisma = new PrismaClient();
 
-const aliasMap = {
-  senang: 'gembira',
-  mengapa: 'kenapa',
-  di_mana: 'ke_mana',
-};
-
+/**
+ * Reads a text file containing a list of filenames (one per line)
+ * and returns them as an array of strings.
+ * @param filename The name of the file to read (e.g., 'data.txt').
+ * @returns A promise that resolves to an array of filenames.
+ */
 async function readAndParseFile(filename: string): Promise<string[]> {
   try {
     const filePath = path.join(__dirname, filename);
     const fileContent = await fs.readFile(filePath, 'utf-8');
-    return fileContent
-      .replace(/"/g, '')
-      .split(',')
-      .map((entry) => entry.trim());
+    // Split by newline and filter out any empty lines
+    return fileContent.split('\n').filter((entry) => entry.trim() !== '');
   } catch (error) {
     console.error(`Error reading file ${filename}:`, error);
     return [];
@@ -28,8 +26,9 @@ async function readAndParseFile(filename: string): Promise<string[]> {
 async function main() {
   console.log('Starting database seeding...');
 
-  const alphabetNames = await readAndParseFile('bisindo_alphabets.txt');
-  const wordNames = await readAndParseFile('bisindo_words.txt');
+  // Assumes the list of .m3u8 files is in a file named 'data.txt'
+  // in the same directory as this script.
+  const fileNames = await readAndParseFile('data.txt');
 
   const streamServer = process.env.STREAM_SERVER;
 
@@ -40,50 +39,59 @@ async function main() {
     process.exit(1);
   }
 
-  // Seed alphabet entries
-  console.log('Seeding alphabet entries...');
-  for (const rawName of alphabetNames) {
-    const splited = rawName.split('_');
-    const removedPrefix: string = rawName.replace('BISINDO_', '');
-    const name: string = removedPrefix.replace('_', ' ');
-    const url = `${streamServer}/${splited[0]}_${name}.m3u8`;
+  // A map to handle compound words and create relevant aliases.
+  // The key should match the name part from the filename (e.g., "mengapa_kenapa").
+  const aliasMap: { [key: string]: string[] } = {
+    mengapa_kenapa: ['mengapa', 'kenapa'],
+    dimana_kemana: ['dimana', 'di mana', 'ke mana'],
+    terima_kasih: ['terimakasih'],
+  };
 
-    await prisma.entry.create({
-      data: {
-        name: name,
-        url: url,
-        signLang: splited[0] as SignLanguage,
-        type: 'LETTER',
-      },
-    });
-  }
+  console.log(`Found ${fileNames.length} files to process...`);
 
-  // Seed word entries
-  console.log('Seeding word entries...');
-  for (const rawName of wordNames) {
-    const splited = rawName.split('_');
-    const removedPrefix: string = rawName.replace('BISINDO_', '');
-    const name: string = removedPrefix.replace('_', ' ');
-    const url = `${streamServer}/${splited[0]}_${name}.m3u8`;
+  for (const rawFilename of fileNames) {
+    // Example rawFilename: "BISINDO-terima_kasih.m3u8"
 
-    // Check for an alias
-    const aliasName = aliasMap[name as keyof typeof aliasMap];
+    // 1. Get the part without the extension
+    const nameWithPrefix = rawFilename.replace('.m3u8', ''); // "BISINDO-terima_kasih"
 
-    // Construct the data object
+    // 2. Split by the first hyphen to separate prefix and name
+    const parts = nameWithPrefix.split(/-(.+)/);
+    if (parts.length < 2) {
+      console.warn(`Skipping malformed filename: ${rawFilename}`);
+      continue;
+    }
+    const signLang = parts[0] as SignLanguage; // "BISINDO"
+    const namePart = parts[1]; // "terima_kasih"
+
+    // 3. Replace underscores with spaces to get the final name for display
+    const finalName = namePart.replace(/_/g, ' '); // "terima kasih"
+
+    // 4. Determine the type (LETTER or WORD)
+    const type = finalName.length === 1 ? 'LETTER' : 'WORD';
+
+    // 5. Construct the full URL for the stream
+    const url = `${streamServer}/${rawFilename}`;
+
+    // 6. Construct the base data object for Prisma
     const entryData: Prisma.EntryCreateInput = {
-      name: name,
+      name: finalName,
       url: url,
-      signLang: splited[0] as SignLanguage,
-      type: 'WORD',
+      signLang: signLang,
+      type: type,
+      source: 'https://youtube.com', // Default source
     };
 
-    // If an alias exists, add it to the nested create
-    if (aliasName) {
+    // 7. Check for and add aliases if they exist for the given word
+    const aliases = aliasMap[namePart];
+    if (aliases && aliases.length > 0 && type === 'WORD') {
       entryData.aliases = {
-        create: [{ name: aliasName }],
+        create: aliases.map((alias) => ({ name: alias })),
       };
     }
 
+    // 8. Create the entry in the database
+    console.log(`Creating entry for: "${finalName}"`);
     await prisma.entry.create({ data: entryData });
   }
 
