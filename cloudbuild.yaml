@@ -1,0 +1,33 @@
+steps:
+  # 1. Build the container image using the Dockerfile you already have
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-southeast2-docker.pkg.dev/${PROJECT_ID}/icara-repo/icara-api:${COMMIT_SHA}'
+      - '.'
+
+  # 2. Push the image to Google Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/icara-repo/icara-api:${COMMIT_SHA}'
+
+  # 3. Deploy to Cloud Run with all the necessary connections and secrets
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'icara-api'
+      - '--image=asia-southeast2-docker.pkg.dev/${PROJECT_ID}/icara-repo/icara-api:${COMMIT_SHA}'
+      - '--region=asia-southeast2' # Use the same region as your database
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+
+      # Use the full "Connection name" you provided
+      - '--add-sql-instance=fluid-guide-468514-b7:asia-southeast2:icara-db'
+
+      # --- This securely injects your environment variables from Secret Manager ---
+      - '--set-secrets=DATABASE_URL=DATABASE_URL_SECRET:latest'
+      - '--set-secrets=STREAM_SERVER=STREAM_SERVER_SECRET:latest'
