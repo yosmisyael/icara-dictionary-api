@@ -1,4 +1,3 @@
-
 # iCara Dictionary API
 
 RESTful API for iCara dictionary feature
